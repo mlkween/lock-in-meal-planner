@@ -10,6 +10,17 @@
   <div class="max-w-4xl mx-auto p-6 space-y-8">
     <h1 class="text-3xl font-bold text-center my-10">💥 It's Time to Lock In 💥</h1>
 
+    <!-- User Selector and Consolidated View Toggle -->
+    <div class="flex justify-center mb-6 gap-4">
+      <label for="user-selector" class="font-medium">Select User:</label>
+      <select id="user-selector" class="border p-2 rounded-lg">
+        <option value="user1">Donny</option>
+        <option value="user2">Karina</option>
+      </select>
+      <button id="view-consolidated" class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">View Consolidated Plans</button>
+      <button id="view-personal" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 hidden">View My Plan</button>
+    </div>
+
     <!-- Weekly Plan Summary Section -->
     <section id="weekly-plan-summary" class="bg-white p-6 rounded-2xl shadow mb-8">
   <h2 class="text-2xl font-semibold mb-4">🗓️ Weekly Meal Plan Summary</h2>
@@ -94,11 +105,45 @@
 
   <!-- JavaScript -->
   <script>
-  let recipeIdCounter = 0;
-  const recipeListEl = document.getElementById("recipe-list");
+let recipeIdCounter = 0;
+const recipeListEl = document.getElementById("recipe-list");
+const userSelector = document.getElementById("user-selector");
+const viewConsolidatedBtn = document.getElementById("view-consolidated");
+const viewPersonalBtn = document.getElementById("view-personal");
+let currentUser = localStorage.getItem("currentUser") || "user1";
+let consolidatedMode = false;
 
-  function saveRecipesToStorage() {
-    const allRecipes = Array.from(document.querySelectorAll("#recipe-list > div")).map(el => {
+function setCurrentUser(user) {
+  currentUser = user;
+  localStorage.setItem("currentUser", user);
+  document.getElementById("target-calories").value = getTargetCalories();
+  loadPlanForDay(document.getElementById("planner-day").value);
+  renderWeeklyPlanSummary();
+  renderGroceryList();
+}
+userSelector.value = currentUser;
+userSelector.onchange = () => {
+  consolidatedMode = false;
+  viewPersonalBtn.classList.add("hidden");
+  setCurrentUser(userSelector.value);
+};
+viewConsolidatedBtn.onclick = () => {
+  consolidatedMode = true;
+  renderConsolidatedPlan();
+  viewConsolidatedBtn.classList.add("hidden");
+  viewPersonalBtn.classList.remove("hidden");
+};
+viewPersonalBtn.onclick = () => {
+  consolidatedMode = false;
+  renderWeeklyPlanSummary();
+  renderGroceryList();
+  viewPersonalBtn.classList.add("hidden");
+  viewConsolidatedBtn.classList.remove("hidden");
+};
+
+// --- RECIPES (SHARED) ---
+function saveRecipesToStorage() {
+  const allRecipes = Array.from(document.querySelectorAll("#recipe-list > div")).map(el => {
       const id = el.getAttribute("data-id");
       const name = el.querySelector("h3")?.innerText || "";
       const ingredients = Array.from(el.querySelectorAll("ul li")).map(li => li.innerText);
@@ -251,24 +296,32 @@
       .filter(v => v && v !== "");
   }
 
-  function savePlan() {
+  // --- MEAL PLANS (PER USER) ---
+  function getMealPlans() {
+  const plans = JSON.parse(localStorage.getItem("mealPlansByUser") || "{}");
+  return plans;
+}
+function saveMealPlans(plans) {
+  localStorage.setItem("mealPlansByUser", JSON.stringify(plans));
+}
+function savePlan() {
   const day = document.getElementById("planner-day").value;
   const plan = {
     lunch: getSelectedValues(document.getElementById("lunch")),
     dinner: getSelectedValues(document.getElementById("dinner")),
     snacks: getSelectedValues(document.getElementById("snacks"))
   };
-  let allPlans = JSON.parse(localStorage.getItem("mealPlans") || "{}\n");
-  allPlans[day] = plan;
-  localStorage.setItem("mealPlans", JSON.stringify(allPlans));
+  let allPlans = getMealPlans();
+  if (!allPlans[currentUser]) allPlans[currentUser] = {};
+  allPlans[currentUser][day] = plan;
+  saveMealPlans(allPlans);
   alert(`Plan saved for ${day}!`);
   renderWeeklyPlanSummary();
   renderGroceryList();
 }
-
 function loadPlanForDay(day) {
-  const allPlans = JSON.parse(localStorage.getItem("mealPlans") || "{}\n");
-  const plan = allPlans[day] || {};
+  let allPlans = getMealPlans();
+  const plan = (allPlans[currentUser] && allPlans[currentUser][day]) || {};
   ["lunch", "dinner", "snacks"].forEach(meal => {
     const select = document.getElementById(meal);
     if (select) {
@@ -279,42 +332,34 @@ function loadPlanForDay(day) {
   });
 }
 
-function populateDropdowns() {
-  const saved = JSON.parse(localStorage.getItem("recipes") || "[]");
-  const dropdownIds = ["lunch", "dinner", "snacks"];
-  dropdownIds.forEach(id => {
-    const select = document.getElementById(id);
-    if (!select) return;
-    select.innerHTML = `<option value="">-- ${id.charAt(0).toUpperCase() + id.slice(1)} --</option>`;
-    saved.forEach(recipe => {
-      const option = document.createElement("option");
-      option.value = recipe.id;
-      option.textContent = recipe.name;
-      select.appendChild(option);
-    });
-  });
+// --- TARGET CALORIES (PER USER) ---
+function getTargetCalories() {
+  const allTargets = JSON.parse(localStorage.getItem("targetCaloriesByUser") || "{}");
+  return allTargets[currentUser] || "";
 }
-
-  function getTargetCalories() {
-  return parseInt(localStorage.getItem("targetCalories") || document.getElementById("target-calories").value || 0);
-}
-
 document.getElementById("save-target-calories").onclick = function() {
   const val = document.getElementById("target-calories").value;
   if (val && parseInt(val) > 0) {
-    localStorage.setItem("targetCalories", val);
+    let allTargets = JSON.parse(localStorage.getItem("targetCaloriesByUser") || "{}");
+    allTargets[currentUser] = val;
+    localStorage.setItem("targetCaloriesByUser", JSON.stringify(allTargets));
     renderWeeklyPlanSummary();
   }
 };
+document.getElementById("target-calories").value = getTargetCalories();
 
-document.getElementById("target-calories").value = localStorage.getItem("targetCalories") || "";
-
+// --- WEEKLY PLAN SUMMARY (PER USER) ---
 function renderWeeklyPlanSummary() {
-  const allPlans = JSON.parse(localStorage.getItem("mealPlans") || "{}\n");
+  if (consolidatedMode) {
+    renderConsolidatedPlan();
+    return;
+  }
+  const allPlans = getMealPlans();
+  const userPlans = allPlans[currentUser] || {};
   const recipes = JSON.parse(localStorage.getItem("recipes") || "[]");
   const recipeMap = Object.fromEntries(recipes.map(r => [r.id, r]));
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  const targetCalories = getTargetCalories();
+  const targetCalories = parseInt(getTargetCalories()) || 0;
   let html = `<div class="overflow-x-auto"><table class="min-w-full text-sm text-left border">
     <thead><tr class="bg-gray-100">
       <th class="p-2 border">Day</th>
@@ -324,10 +369,9 @@ function renderWeeklyPlanSummary() {
       <th class="p-2 border">Total Calories</th>
       <th class="p-2 border">Total Protein (g)</th>
     </tr></thead><tbody>`;
-  // For pie chart
   let totalCarbs = 0, totalProtein = 0, totalFat = 0;
   days.forEach(day => {
-    const plan = allPlans[day] || {};
+    const plan = userPlans[day] || {};
     let totalCalories = 0;
     let totalProteinDay = 0;
     let totalCarbsDay = 0;
@@ -351,11 +395,9 @@ function renderWeeklyPlanSummary() {
         return `<td class='p-2 border'></td>`;
       }
     });
-    // For pie chart
     totalCarbs += totalCarbsDay;
     totalProtein += totalProteinDay;
     totalFat += totalFatDay;
-    // Highlight calories if over target
     let calClass = "p-2 border font-bold";
     if (targetCalories && totalCalories > targetCalories) calClass += " text-red-600 bg-red-100";
     html += `<tr>
@@ -370,13 +412,59 @@ function renderWeeklyPlanSummary() {
   renderMacroPieChart(totalCarbs, totalProtein, totalFat);
 }
 
-let macroPieChart = null;
+// --- CONSOLIDATED VIEW ---
+function renderConsolidatedPlan() {
+  const allPlans = getMealPlans();
+  const recipes = JSON.parse(localStorage.getItem("recipes") || "[]");
+  const recipeMap = Object.fromEntries(recipes.map(r => [r.id, r]));
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const users = ["user1", "user2"];
+  let html = `<div class="overflow-x-auto"><table class="min-w-full text-sm text-left border">
+    <thead><tr class="bg-gray-100">
+      <th class="p-2 border">Day</th>
+      <th class="p-2 border">Donny Lunch</th>
+      <th class="p-2 border">Donny Dinner</th>
+      <th class="p-2 border">Donny Snacks</th>
+      <th class="p-2 border">Karina Lunch</th>
+      <th class="p-2 border">Karina Dinner</th>
+      <th class="p-2 border">Karina Snacks</th>
+    </tr></thead><tbody>`;
+  days.forEach(day => {
+    html += `<tr>
+      <td class="p-2 border font-semibold">${day}</td>`;
+    users.forEach(user => {
+      const plan = (allPlans[user] && allPlans[user][day]) || {};
+      ["lunch", "dinner", "snacks"].forEach(meal => {
+        const ids = Array.isArray(plan[meal]) ? plan[meal] : (plan[meal] ? [plan[meal]] : []);
+        if (ids.length > 0) {
+          const mealDetails = ids.map(id => {
+            const recipe = recipeMap[id];
+            if (recipe) {
+              return `<div>${recipe.name}<br><span class='text-xs text-gray-500'>${recipe.calories} cal, ${recipe.protein}g protein</span></div>`;
+            }
+            return "";
+          }).join("");
+          html += `<td class='p-2 border'>${mealDetails}</td>`;
+        } else {
+          html += `<td class='p-2 border'></td>`;
+        }
+      });
+    });
+    html += `</tr>`;
+  });
+  html += `</tbody></table></div>`;
+  document.getElementById("weekly-plan-table").innerHTML = html;
+  document.getElementById('macro-pie-chart').style.display = 'none';
+  document.getElementById('macro-pie-legend').style.display = 'none';
+}
 function renderMacroPieChart(carbs, protein, fat) {
+  document.getElementById('macro-pie-chart').style.display = '';
+  document.getElementById('macro-pie-legend').style.display = '';
   const ctx = document.getElementById('macro-pie-chart').getContext('2d');
-  if (macroPieChart) macroPieChart.destroy();
+  if (window.macroPieChart) window.macroPieChart.destroy();
   const total = carbs + protein + fat;
   const percent = total > 0 ? [carbs, protein, fat].map(v => Math.round((v / total) * 100)) : [0, 0, 0];
-  macroPieChart = new Chart(ctx, {
+  window.macroPieChart = new Chart(ctx, {
     type: 'pie',
     data: {
       labels: [
@@ -387,9 +475,9 @@ function renderMacroPieChart(carbs, protein, fat) {
       datasets: [{
         data: [carbs, protein, fat],
         backgroundColor: [
-          'rgba(59, 130, 246, 0.7)', // blue
-          'rgba(34, 197, 94, 0.7)',  // green
-          'rgba(251, 191, 36, 0.7)'  // yellow
+          'rgba(59, 130, 246, 0.7)',
+          'rgba(34, 197, 94, 0.7)',
+          'rgba(251, 191, 36, 0.7)'
         ],
         borderColor: [
           'rgba(59, 130, 246, 1)',
@@ -401,14 +489,8 @@ function renderMacroPieChart(carbs, protein, fat) {
     },
     options: {
       plugins: {
-        legend: {
-          display: false // Hide built-in legend
-        },
-        title: {
-          display: true,
-          text: 'Weekly Macro % Breakdown',
-          font: { size: 13 }
-        },
+        legend: { display: false },
+        title: { display: true, text: 'Weekly Macro % Breakdown', font: { size: 13 } },
         tooltip: {
           callbacks: {
             label: function(context) {
@@ -421,7 +503,7 @@ function renderMacroPieChart(carbs, protein, fat) {
       }
     }
   });
-  // Custom legend on the right
+  // Custom legend
   const legendColors = [
     'rgba(59, 130, 246, 0.7)',
     'rgba(34, 197, 94, 0.7)',
@@ -440,37 +522,18 @@ function renderMacroPieChart(carbs, protein, fat) {
   document.getElementById('macro-pie-legend').innerHTML = legendHtml;
 }
 
-function getGrocerySection(ingredientName) {
-  // Lowercase for easier matching
-  const name = ingredientName.toLowerCase();
-  // Simple keyword-based mapping
-  if (/milk|cheese|yogurt|butter|cream|egg/.test(name)) return "Dairy";
-  if (/lettuce|spinach|kale|cabbage|carrot|tomato|onion|pepper|broccoli|cucumber|zucchini|avocado|celery|mushroom|potato|sweet potato|garlic|ginger|herb|parsley|cilantro|basil|chive|leek|bean|pea|corn|asparagus|radish|beet|squash|eggplant|cauliflower|greens|arugula|salad|scallion|shallot/.test(name)) return "Produce";
-  if (/apple|banana|orange|lemon|lime|berry|grape|melon|watermelon|peach|plum|pear|mango|pineapple|kiwi|fruit|apricot|cherry|date|fig|pomegranate/.test(name)) return "Produce";
-  if (/chicken|beef|pork|turkey|lamb|steak|ground|bacon|sausage|ham|duck|veal/.test(name)) return "Meat";
-  if (/salmon|tuna|shrimp|fish|cod|trout|sardine|anchovy|mackerel|seafood|crab|lobster|clam|mussel|oyster|scallop/.test(name)) return "Seafood";
-  if (/bread|bun|roll|bagel|tortilla|pita|wrap|brioche|sourdough|rye|ciabatta|focaccia/.test(name)) return "Bakery";
-  if (/rice|pasta|spaghetti|noodle|macaroni|penne|fusilli|couscous|quinoa|grain|barley|oat|farro|bulgur|polenta|flour|cracker|cereal|granola|tortilla chip|chip/.test(name)) return "Grains";
-  if (/oil|vinegar|dressing|sauce|soy sauce|tamari|ketchup|mustard|mayo|mayonnaise|salsa|hot sauce|bbq|pesto|teriyaki|hoisin|syrup/.test(name)) return "Condiments";
-  if (/salt|pepper|spice|cumin|coriander|paprika|chili|cinnamon|nutmeg|clove|allspice|oregano|thyme|rosemary|sage|dill|bay leaf|seasoning|turmeric|curry/.test(name)) return "Spices & Seasonings";
-  if (/sugar|honey|sweetener|jam|jelly|chocolate|candy|dessert|cookie|biscuit|cake|brownie|ice cream/.test(name)) return "Sweets & Snacks";
-  if (/nut|almond|cashew|peanut|walnut|pecan|hazelnut|pistachio|seed|sunflower|pumpkin seed|chia|hemp|flax/.test(name)) return "Nuts & Seeds";
-  if (/bean|lentil|chickpea|tofu|tempeh|edamame|soy/.test(name)) return "Plant Protein";
-  if (/water|juice|soda|pop|cola|coffee|tea|wine|beer|alcohol|drink|beverage/.test(name)) return "Beverages";
-  if (/frozen|ice|frozen vegetable|frozen fruit|frozen meal|frozen pizza/.test(name)) return "Frozen";
-  if (/canned|jar|tin|pickles|olives|soup|broth|stock|coconut milk|evaporated milk|condensed milk/.test(name)) return "Canned & Jarred";
-  if (/butter|margarine|spread/.test(name)) return "Dairy";
-  return "Other";
-}
-
+// --- GROCERY LIST (PER USER OR CONSOLIDATED) ---
 function renderGroceryList() {
-  const allPlans = JSON.parse(localStorage.getItem("mealPlans") || "{}\n");
+  let allPlans = getMealPlans();
+  let userPlans = consolidatedMode
+    ? Object.assign({}, ...(Object.values(allPlans)))
+    : (allPlans[currentUser] || {});
   const recipes = JSON.parse(localStorage.getItem("recipes") || "[]");
   const recipeMap = Object.fromEntries(recipes.map(r => [r.id, r]));
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   const recipeCount = {};
   days.forEach(day => {
-    const plan = allPlans[day] || {};
+    const plan = userPlans[day] || {};
     ["lunch", "dinner", "snacks"].forEach(meal => {
       const ids = Array.isArray(plan[meal]) ? plan[meal] : (plan[meal] ? [plan[meal]] : []);
       ids.forEach(id => {
@@ -482,13 +545,11 @@ function renderGroceryList() {
       });
     });
   });
-  // Collect and multiply ingredients
   const ingredientTotals = {};
   Object.entries(recipeCount).forEach(([id, count]) => {
     const recipe = recipeMap[id];
     if (recipe && Array.isArray(recipe.ingredients)) {
       recipe.ingredients.forEach(ingredient => {
-        // Try to extract a leading number and unit (e.g., '150g salmon')
         const match = ingredient.match(/^(\d+(?:[.,]\d+)?)([a-zA-Z]*)\s+(.+)$/);
         let key, section;
         if (match) {
@@ -502,7 +563,6 @@ function renderGroceryList() {
           }
           ingredientTotals[section][key].qty += qty * count;
         } else {
-          // No number/unit, just count occurrences
           key = ingredient.toLowerCase();
           section = getGrocerySection(ingredient);
           if (!ingredientTotals[section]) ingredientTotals[section] = {};
@@ -514,7 +574,6 @@ function renderGroceryList() {
       });
     }
   });
-  // Render grouped list
   const listEl = document.getElementById("grocery-list-items");
   const sectionOrder = [
     "Produce", "Meat", "Seafood", "Dairy", "Bakery", "Grains", "Plant Protein", "Nuts & Seeds", "Canned & Jarred", "Condiments", "Spices & Seasonings", "Sweets & Snacks", "Frozen", "Beverages", "Other"
@@ -544,11 +603,15 @@ function renderGroceryList() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-    loadRecipesFromStorage();
-    populateDropdowns();
-    renderWeeklyPlanSummary();
-    renderGroceryList();
-  });
+  loadRecipesFromStorage();
+  populateDropdowns();
+  setCurrentUser(currentUser);
+  renderWeeklyPlanSummary();
+  renderGroceryList();
+  document.getElementById("planner-day").onchange = function() {
+    loadPlanForDay(this.value);
+  };
+});
 </script>
 
 
