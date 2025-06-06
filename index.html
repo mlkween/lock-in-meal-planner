@@ -172,6 +172,7 @@ function saveRecipesToStorage() {
       recipeEl.innerHTML = renderRecipeDisplay(r);
       recipeListEl.appendChild(recipeEl);
     });
+    populateDropdowns(); // Ensure dropdowns are updated after loading recipes
   }
 
   function addRecipe() {
@@ -197,7 +198,7 @@ function saveRecipesToStorage() {
     recipeListEl.appendChild(recipeEl);
 
     saveRecipesToStorage();
-    populateDropdowns();
+    populateDropdowns(); // Ensure dropdowns are updated after adding a recipe
     clearRecipeForm();
   }
 
@@ -604,7 +605,6 @@ function renderGroceryList() {
 
 window.addEventListener("DOMContentLoaded", () => {
   loadRecipesFromStorage();
-  populateDropdowns();
   setCurrentUser(currentUser);
   renderWeeklyPlanSummary();
   renderGroceryList();
