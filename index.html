@@ -552,30 +552,35 @@ function renderMacroPieChart(carbs, protein, fat) {
 function renderGroceryList() {
   let allPlans = getMealPlans();
   let userPlans = consolidatedMode
-    ? Object.assign({}, ...(Object.values(allPlans)))
-    : (allPlans[currentUser] || {});
+    ? allPlans // Use all users' plans
+    : { [currentUser]: allPlans[currentUser] || {} };
   const recipes = JSON.parse(localStorage.getItem("recipes") || "[]");
   const recipeMap = Object.fromEntries(recipes.map(r => [r.id, r]));
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  // Collect all recipe IDs for the week for all users (if consolidated) or current user
   const recipeCount = {};
-  days.forEach(day => {
-    const plan = userPlans[day] || {};
-    ["lunch", "dinner", "snacks"].forEach(meal => {
-      const ids = Array.isArray(plan[meal]) ? plan[meal] : (plan[meal] ? [plan[meal]] : []);
-      ids.forEach(id => {
-        if (recipeCount[id]) {
-          recipeCount[id]++;
-        } else {
-          recipeCount[id] = 1;
-        }
+  Object.values(userPlans).forEach(userPlan => {
+    days.forEach(day => {
+      const plan = userPlan && userPlan[day] ? userPlan[day] : {};
+      ["lunch", "dinner", "snacks"].forEach(meal => {
+        const ids = Array.isArray(plan[meal]) ? plan[meal] : (plan[meal] ? [plan[meal]] : []);
+        ids.forEach(id => {
+          if (recipeCount[id]) {
+            recipeCount[id]++;
+          } else {
+            recipeCount[id] = 1;
+          }
+        });
       });
     });
   });
+  // Collect and sum ingredients
   const ingredientTotals = {};
   Object.entries(recipeCount).forEach(([id, count]) => {
     const recipe = recipeMap[id];
     if (recipe && Array.isArray(recipe.ingredients)) {
       recipe.ingredients.forEach(ingredient => {
+        // Try to extract a leading number and unit (e.g., '150g salmon')
         const match = ingredient.match(/^(\d+(?:[.,]\d+)?)([a-zA-Z]*)\s+(.+)$/);
         let key, section;
         if (match) {
@@ -589,6 +594,7 @@ function renderGroceryList() {
           }
           ingredientTotals[section][key].qty += qty * count;
         } else {
+          // No number/unit, just count occurrences
           key = ingredient.toLowerCase();
           section = getGrocerySection(ingredient);
           if (!ingredientTotals[section]) ingredientTotals[section] = {};
@@ -600,6 +606,7 @@ function renderGroceryList() {
       });
     }
   });
+  // Render grouped list
   const listEl = document.getElementById("grocery-list-items");
   const sectionOrder = [
     "Produce", "Meat", "Seafood", "Dairy", "Bakery", "Grains", "Plant Protein", "Nuts & Seeds", "Canned & Jarred", "Condiments", "Spices & Seasonings", "Sweets & Snacks", "Frozen", "Beverages", "Other"
