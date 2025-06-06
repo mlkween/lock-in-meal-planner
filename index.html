@@ -21,26 +21,27 @@
       <button id="view-personal" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 hidden">View My Plan</button>
     </div>
 
-    <!-- Weekly Plan Summary Section -->
-    <section id="weekly-plan-summary" class="bg-white p-6 rounded-2xl shadow mb-8">
-  <h2 class="text-2xl font-semibold mb-4">🗓️ Weekly Meal Plan Summary</h2>
-  <div class="mb-4 flex flex-col md:flex-row md:items-center gap-4">
-    <label for="target-calories" class="font-medium">Target Daily Calories:</label>
-    <input id="target-calories" type="number" min="0" class="border p-2 rounded-lg w-40" placeholder="e.g. 2000" />
-    <button id="save-target-calories" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">Save Target</button>
-  </div>
-  <div id="weekly-plan-table"></div>
-  <div class="mt-4 flex flex-col items-center md:flex-row md:justify-center md:items-center gap-2">
-    <canvas id="macro-pie-chart" style="width:500px;height:500px;max-width:500px;max-height:500px;" width="500" height="500"></canvas>
-    <div id="macro-pie-legend" class="ml-4"></div>
-  </div>
-</section>
-
-    <!-- Grocery List Section -->
-    <section id="grocery-list" class="bg-white p-6 rounded-2xl shadow mb-8">
-  <h2 class="text-2xl font-semibold mb-4">🛒 Grocery List</h2>
-  <ul id="grocery-list-items" class="list-disc pl-6 text-sm space-y-1"></ul>
-</section>
+    <!-- Weekly Plan Summary Section + Floating Grocery List -->
+    <div class="flex flex-col lg:flex-row gap-8">
+      <section id="weekly-plan-summary" class="flex-1 bg-white p-6 rounded-2xl shadow mb-8">
+        <h2 class="text-2xl font-semibold mb-4">🗓️ Weekly Meal Plan Summary</h2>
+        <div class="mb-4 flex flex-col md:flex-row md:items-center gap-4">
+          <label for="target-calories" class="font-medium">Target Daily Calories:</label>
+          <input id="target-calories" type="number" min="0" class="border p-2 rounded-lg w-40" placeholder="e.g. 2000" />
+          <button id="save-target-calories" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">Save Target</button>
+        </div>
+        <div id="weekly-plan-table"></div>
+        <div class="mt-4 flex flex-col items-center md:flex-row md:justify-center md:items-center gap-2">
+          <canvas id="macro-pie-chart" style="width:500px;height:500px;max-width:500px;max-height:500px;" width="500" height="500"></canvas>
+          <div id="macro-pie-legend" class="ml-4"></div>
+        </div>
+      </section>
+      <!-- Floating Grocery List Section -->
+      <aside id="floating-grocery-list" class="lg:w-80 w-full bg-white p-6 rounded-2xl shadow mb-8 h-fit sticky top-8 self-start">
+        <h2 class="text-xl font-semibold mb-4">🛒 Grocery List</h2>
+        <ul id="grocery-list-items" class="list-disc list-inside space-y-1"></ul>
+      </aside>
+    </div>
 
     <!-- Meals Section -->
     <section id="plan-meals" class="bg-white p-6 rounded-2xl shadow space-y-4">
@@ -122,26 +123,28 @@ function setCurrentUser(user) {
   document.getElementById("target-calories").value = getTargetCalories();
   loadPlanForDay(document.getElementById("planner-day").value);
   renderWeeklyPlanSummary();
-  renderGroceryList();
+  // Removed duplicate renderGroceryList() call here
 }
 userSelector.value = currentUser;
 userSelector.onchange = () => {
   consolidatedMode = false;
   viewPersonalBtn.classList.add("hidden");
   setCurrentUser(userSelector.value);
+  renderGroceryList(); // Update grocery list on user change
 };
 viewConsolidatedBtn.onclick = () => {
   consolidatedMode = true;
   renderConsolidatedPlan();
   viewConsolidatedBtn.classList.add("hidden");
   viewPersonalBtn.classList.remove("hidden");
+  renderGroceryList(); // Update grocery list in consolidated mode
 };
 viewPersonalBtn.onclick = () => {
   consolidatedMode = false;
   renderWeeklyPlanSummary();
-  renderGroceryList();
   viewPersonalBtn.classList.add("hidden");
   viewConsolidatedBtn.classList.remove("hidden");
+  renderGroceryList(); // Update grocery list in personal mode
 };
 
 // --- RECIPES (SHARED) ---
@@ -223,6 +226,7 @@ function saveRecipesToStorage() {
     saveRecipesToStorage();
     loadRecipesFromStorage(); // This will also call populateDropdowns
     clearRecipeForm();
+    renderGroceryList(); // Update grocery list after adding recipe
   }
 
   function renderRecipeDisplay({ name, ingredients, calories, protein, fat, carbs }) {
@@ -292,6 +296,7 @@ function saveRecipesToStorage() {
 
     saveRecipesToStorage();
     loadRecipesFromStorage(); // This will also call populateDropdowns
+    renderGroceryList(); // Update grocery list after editing recipe
   }
 
   function cancelEdit(button) {
@@ -305,6 +310,7 @@ function saveRecipesToStorage() {
     container.remove();
     saveRecipesToStorage();
     loadRecipesFromStorage(); // This will also call populateDropdowns
+    renderGroceryList(); // Update grocery list after deleting recipe
   }
 
   function clearRecipeForm() {
@@ -343,7 +349,7 @@ function savePlan() {
   saveMealPlans(allPlans);
   alert(`Plan saved for ${day}!`);
   renderWeeklyPlanSummary();
-  renderGroceryList();
+  renderGroceryList(); // Always update grocery list after saving plan
 }
 function loadPlanForDay(day) {
   let allPlans = getMealPlans();
@@ -378,6 +384,7 @@ document.getElementById("target-calories").value = getTargetCalories();
 function renderWeeklyPlanSummary() {
   if (consolidatedMode) {
     renderConsolidatedPlan();
+    renderGroceryList(); // Ensure grocery list updates in consolidated mode
     return;
   }
   const allPlans = getMealPlans();
@@ -436,6 +443,7 @@ function renderWeeklyPlanSummary() {
   html += `</tbody></table></div>`;
   document.getElementById("weekly-plan-table").innerHTML = html;
   renderMacroPieChart(totalCarbs, totalProtein, totalFat);
+  renderGroceryList(); // Ensure grocery list updates in personal mode
 }
 
 // --- CONSOLIDATED VIEW ---
@@ -482,6 +490,7 @@ function renderConsolidatedPlan() {
   document.getElementById("weekly-plan-table").innerHTML = html;
   document.getElementById('macro-pie-chart').style.display = 'none';
   document.getElementById('macro-pie-legend').style.display = 'none';
+  renderGroceryList(); // Always update grocery list in consolidated mode
 }
 function renderMacroPieChart(carbs, protein, fat) {
   document.getElementById('macro-pie-chart').style.display = '';
@@ -548,6 +557,26 @@ function renderMacroPieChart(carbs, protein, fat) {
   document.getElementById('macro-pie-legend').innerHTML = legendHtml;
 }
 
+// --- GROCERY SECTION HELPER ---
+function getGrocerySection(name) {
+  name = name.toLowerCase();
+  if (/tomato|lettuce|spinach|onion|pepper|carrot|broccoli|cucumber|avocado|greens|apple|banana|berry|lemon|lime|potato|sweet potato|mushroom|zucchini|squash|herb|cilantro|parsley|basil|garlic|ginger|chili|bean sprout|cabbage|corn|pea|celery|radish|beet|asparagus|cauliflower|eggplant|grape|melon|orange|pear|plum|peach|apricot|kiwi|fruit|vegetable/.test(name)) return "Produce";
+  if (/chicken|beef|pork|turkey|lamb|steak|ground meat|bacon|sausage|ham|prosciutto|salami|duck|veal/.test(name)) return "Meat";
+  if (/salmon|shrimp|fish|tuna|cod|tilapia|crab|lobster|scallop|clam|mussel|anchovy|sardine|trout|seafood/.test(name)) return "Seafood";
+  if (/milk|cheese|yogurt|cream|butter|parmesan|mozzarella|feta|ricotta|cottage cheese|greek yogurt|dairy|half and half/.test(name)) return "Dairy";
+  if (/bread|bun|roll|bagel|tortilla|pita|naan|brioche|sourdough|bakery/.test(name)) return "Bakery";
+  if (/rice|pasta|noodle|spaghetti|macaroni|quinoa|couscous|oat|oatmeal|barley|farro|grain|bulgur|polenta|flour|cracker|cereal/.test(name)) return "Grains";
+  if (/tofu|tempeh|seitan|plant protein/.test(name)) return "Plant Protein";
+  if (/almond|walnut|pecan|cashew|peanut|hazelnut|macadamia|nut|seed|chia|flax|pumpkin seed|sunflower seed|hemp seed|sesame/.test(name)) return "Nuts & Seeds";
+  if (/bean|lentil|chickpea|pea|black bean|kidney bean|canned|jarred|can|jar/.test(name)) return "Canned & Jarred";
+  if (/ketchup|mustard|mayo|mayonnaise|sriracha|soy sauce|tamari|vinegar|hot sauce|bbq|barbecue|salsa|dressing|sauce|condiment/.test(name)) return "Condiments";
+  if (/salt|pepper|cumin|coriander|paprika|oregano|thyme|rosemary|spice|seasoning|cinnamon|nutmeg|clove|allspice|turmeric|curry|chili powder|herb/.test(name)) return "Spices & Seasonings";
+  if (/chocolate|candy|cookie|cake|brownie|ice cream|dessert|sweet|snack|cracker|chip|granola bar|energy bar|protein bar/.test(name)) return "Sweets & Snacks";
+  if (/frozen|ice|frozen vegetable|frozen fruit|frozen meal|frozen food/.test(name)) return "Frozen";
+  if (/juice|soda|coffee|tea|water|beverage|drink|wine|beer|alcohol/.test(name)) return "Beverages";
+  return "Other";
+}
+
 // --- GROCERY LIST (PER USER OR CONSOLIDATED) ---
 function renderGroceryList() {
   let allPlans = getMealPlans();
@@ -557,54 +586,45 @@ function renderGroceryList() {
   const recipes = JSON.parse(localStorage.getItem("recipes") || "[]");
   const recipeMap = Object.fromEntries(recipes.map(r => [r.id, r]));
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  // Collect all recipe IDs for the week for all users (if consolidated) or current user
-  const recipeCount = {};
+  // Collect and sum ingredients for all selected recipes for all days and all users
+  const ingredientTotals = {};
   Object.values(userPlans).forEach(userPlan => {
     days.forEach(day => {
       const plan = userPlan && userPlan[day] ? userPlan[day] : {};
       ["lunch", "dinner", "snacks"].forEach(meal => {
         const ids = Array.isArray(plan[meal]) ? plan[meal] : (plan[meal] ? [plan[meal]] : []);
         ids.forEach(id => {
-          if (recipeCount[id]) {
-            recipeCount[id]++;
-          } else {
-            recipeCount[id] = 1;
+          const recipe = recipeMap[id];
+          if (recipe && Array.isArray(recipe.ingredients)) {
+            recipe.ingredients.forEach(ingredient => {
+              // Try to extract a leading number and unit (e.g., '150g salmon')
+              const match = ingredient.match(/^(\d+(?:[.,]\d+)?)([a-zA-Z]*)\s+(.+)$/);
+              let key, section;
+              if (match) {
+                let [_, qty, unit, name] = match;
+                qty = parseFloat(qty.replace(",", "."));
+                key = (unit + " " + name).toLowerCase().trim();
+                section = getGrocerySection(name);
+                if (!ingredientTotals[section]) ingredientTotals[section] = {};
+                if (!ingredientTotals[section][key]) {
+                  ingredientTotals[section][key] = { qty: 0, unit, name };
+                }
+                ingredientTotals[section][key].qty += qty;
+              } else {
+                // No number/unit, just count occurrences
+                key = ingredient.toLowerCase();
+                section = getGrocerySection(ingredient);
+                if (!ingredientTotals[section]) ingredientTotals[section] = {};
+                if (!ingredientTotals[section][key]) {
+                  ingredientTotals[section][key] = { qty: 0, unit: "", name: ingredient };
+                }
+                ingredientTotals[section][key].qty += 1;
+              }
+            });
           }
         });
       });
     });
-  });
-  // Collect and sum ingredients
-  const ingredientTotals = {};
-  Object.entries(recipeCount).forEach(([id, count]) => {
-    const recipe = recipeMap[id];
-    if (recipe && Array.isArray(recipe.ingredients)) {
-      recipe.ingredients.forEach(ingredient => {
-        // Try to extract a leading number and unit (e.g., '150g salmon')
-        const match = ingredient.match(/^(\d+(?:[.,]\d+)?)([a-zA-Z]*)\s+(.+)$/);
-        let key, section;
-        if (match) {
-          let [_, qty, unit, name] = match;
-          qty = parseFloat(qty.replace(",", "."));
-          key = (unit + " " + name).toLowerCase().trim();
-          section = getGrocerySection(name);
-          if (!ingredientTotals[section]) ingredientTotals[section] = {};
-          if (!ingredientTotals[section][key]) {
-            ingredientTotals[section][key] = { qty: 0, unit, name };
-          }
-          ingredientTotals[section][key].qty += qty * count;
-        } else {
-          // No number/unit, just count occurrences
-          key = ingredient.toLowerCase();
-          section = getGrocerySection(ingredient);
-          if (!ingredientTotals[section]) ingredientTotals[section] = {};
-          if (!ingredientTotals[section][key]) {
-            ingredientTotals[section][key] = { qty: 0, unit: "", name: ingredient };
-          }
-          ingredientTotals[section][key].qty += count;
-        }
-      });
-    }
   });
   // Render grouped list
   const listEl = document.getElementById("grocery-list-items");
@@ -640,9 +660,10 @@ window.addEventListener("DOMContentLoaded", () => {
   populateDropdowns(); // Ensure dropdowns are populated on load
   setCurrentUser(currentUser);
   renderWeeklyPlanSummary();
-  renderGroceryList();
+  renderGroceryList(); // Ensure grocery list is rendered on load
   document.getElementById("planner-day").onchange = function() {
     loadPlanForDay(this.value);
+    renderGroceryList(); // Update grocery list when changing day
   };
 });
 </script>
